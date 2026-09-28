@@ -1,11 +1,11 @@
 /*v024 - Children in Poverty
-author: MB; 
+author: MB; updated: EB
 
 /* Description: Percentage of people under age 18 in poverty. 
 Numerator: The numerator is the number of people under age 18 living in a household whose income is below the poverty level. Poverty status is defined by family; either everyone in the family is in poverty or no one in the family is in poverty. The characteristics of the family used to determine the poverty threshold are: number of people, number of related children under 18, and whether or not the primary householder is over age 65. Family income is then compared to the poverty threshold; if that family’s income is below that threshold, the family is in poverty.
 Denominator: The total number of people under age 18 in a country. */ 
 
-/* Website to download data: https://www.census.gov/data/datasets/2023/demo/saipe/2023-state-and-county.html 
+/* Website to download data: https://www.census.gov/data/datasets/2024/demo/saipe/2024-state-and-county.html 
  Online documentation: https://www.census.gov/programs-surveys/saipe/technical-documentation/methodology/counties-states/county-level.html 
 
 /*Create 95% confidence intervals from the given 90% confidence intervals.
@@ -23,7 +23,7 @@ libname out "&outpath.";
 
 PROC IMPORT
 OUT= v024
-datafile= "&mypath.\raw_data\SAIPE\estall.xls"
+datafile= "&mypath.\estall.xls"
 out = work.v024
 DBMS= xls REPLACE;
 getnames=yes;
@@ -47,6 +47,6 @@ if v024_cihigh > 1 then v024_cihigh = 1;
 run;
 
 
-data out.v024_s2025;
+data out.v024_s2026;
 set v024_1;
 run; 
