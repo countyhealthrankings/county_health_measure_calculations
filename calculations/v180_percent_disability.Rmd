@@ -1,0 +1,205 @@
+---
+title: "BRFSS v180 - R2026"
+author: EB"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# about
+
+## v180 % Disability: Functional Limitations
+
+### Basic information
+
+- Description
+Percentage of adults reporting any of six specific functional limitations.
+
+- What is the numerator?
+The numerator is the number of respondents who answered ‘yes’ to at least one of the six following questions:
+
+    * “Are you deaf or do you have serious difficulty hearing?”
+    * “Are you blind or do you have serious difficulty seeing, even when wearing glasses?”
+    * “Because of a physical, mental, or emotional condition, do you have serious difficulty concentrating, remembering, or making decisions?”
+    * “Do you have serious difficulty walking or climbing stairs?”
+    * “Do you have difficulty dressing or bathing?”
+    * “Because of a physical, mental, or emotional condition, do you have difficulty doing errands alone such as visiting a doctor´s office or shopping?”
+
+- What is the denominator?
+The denominator is the total number of adult respondents in a county.
+
+### Raw data access
+
+**Directions**
+
+Two datasets are required
+
+(1) PLACES https://data.cdc.gov/500-Cities-Places/PLACES-County-Data-GIS-Friendly-Format-2025-releas/i46a-9kgh
+
+(2) Disability and Health Data System (DHDS)  https://data.cdc.gov/Disability-Health/Disability-and-Health-Data-System-DHDS-/k62p-6esq/data_preview
+
+PLACES dataset is used to obtain county values: "disability_adjprev", "disability_adj95ci" 
+
+DHDS dataset is used to obtain state and national values: where response = 'Any Disability'
+
+When downloading DHDS dataset, include the following filters:
+- YearStart: "2023"
+- YearEnd: "2023"
+- DataValueTypeID: "AGEADJPREV"     (keep data for age-adjusted prevalence)
+- StratificationCategoryID1: "OVERALL"     (keep data for overall population)
+
+Note: for the 2025 release, DHDS state and national data are not available, so the median of counties will be used for state and national values
+
+**Online documentation**
+
+https://www.cdc.gov/places/methodology/index.html
+
+# import packages
+
+```{r}
+library(tidyverse)
+library(haven)
+library(dplyr)
+
+```
+
+# standard county and state fips
+
+- The final dataset will need to be aligned with standard FIPS codes and to include all counties and states.
+```{r }
+fips <-  bind_rows(
+  read_sas("../inputs/county_fips_with_ct_old.sas7bdat") ,
+  read_sas( "../inputs/state_fips.sas7bdat"))  %>% 
+  arrange(statecode, countycode) %>% 
+  glimpse()
+
+df_county_fips <- fips %>% 
+  filter(countycode != "000") %>%  
+  select(1,2,5) %>% 
+  glimpse()
+
+df_state_fips <- fips %>% 
+  filter(countycode == "000") %>% 
+  select(statecode, countycode, state_abbr = state) %>% 
+  glimpse()
+```
+
+# raw data
+
+## PLACES 2025 release (2023 data ) - county data
+
+```{r}
+raw_dir <- "../raw_data/BRFSS/BRFSS_raw.zip"
+
+places_brfss_county <-  read_csv("../BRFSS/PLACES__County_Data_(GIS_Friendly_Format),_2025_release_20251205.csv")  %>%
+  janitor::clean_names() %>% 
+  glimpse()
+```
+
+
+# helpers
+
+## get county data from PLACES
+
+```{r}
+get_vx_county <- function(df, vnum, var_adj, var_ci, df_fips_cnty = df_county_fips){
+  
+  vx_county_raw <- df %>% 
+    select(StateAbbr, CountyName, CountyFIPS,
+           {{ var_adj }}, {{ var_ci }})
+  
+  vx_county_cleaned <- vx_county_raw %>% 
+    mutate({{ var_ci }} := str_remove_all({{ var_ci }}, "[\\(\\)]")) %>% 
+    separate({{ var_ci }}, c("vx_cilow", "vx_cihigh"), sep = ",") %>% 
+    rename(fipscode = CountyFIPS, vx_rawvalue = {{ var_adj }}) %>% 
+    mutate(vx_rawvalue = vx_rawvalue / 100,
+           vx_cilow = as.numeric(vx_cilow) / 100,
+           vx_cihigh = as.numeric(vx_cihigh) / 100) %>% 
+    rename(!!(paste0(vnum, "_rawvalue")) := vx_rawvalue,
+           !!(paste0(vnum, "_cilow")) := vx_cilow,
+           !!(paste0(vnum, "_cihigh")) := vx_cihigh)
+  
+  vx_county <- df_fips_cnty %>%
+    left_join(vx_county_cleaned,
+              by = "fipscode") %>% 
+    select(-c(fipscode,StateAbbr,CountyName))
+  
+  return(vx_county)
+  
+}
+```
+
+
+## add flag_CT
+
+- This function adds a flag to the data frame for Connecticut counties.
+- 'A' = data *available* for a CT county
+- 'U' = data *unavailable* for a CT county
+
+```{r}
+add_flag_CT <- function(df, vnum, old="U", new = "A"){
+  CT_old_lst <- c("001", "003", "005", "007", "009", "011", "013", "015")
+  CT_new_lst <- c("110", "120", "130", "140", "150", "160", "170", "180", "190")
+
+  res <- df %>% 
+    mutate(flag_CT = case_when(
+      statecode == "09" & countycode %in% CT_old_lst ~ old,
+      statecode == "09" & countycode %in% CT_new_lst ~ new,
+      TRUE ~ NA
+    )) %>% 
+    rename(!!(paste0(vnum, "_flag_CT")) := flag_CT)
+  
+  return(res)
+
+}
+
+```
+
+
+# v180 % Disability: Functional Limitations (new measure in 2025)
+
+## process data
+
+```{r}
+v180 <-
+    get_vx_county(
+      df = places_brfss_county,
+      vnum = "v180",
+      var_adj = DISABILITY_AdjPrev,
+      var_ci = DISABILITY_Adj95CI
+    ) %>%
+  arrange(statecode, countycode) %>%
+  add_flag_CT(vnum = "v180", old = "U", new = "A") %>%
+  glimpse()
+```
+
+## get state and national data by taking median of counties
+
+```{r}
+state_data <- v180 %>%
+  group_by(statecode) %>%
+  summarise(v180_rawvalue = median(v180_rawvalue, na.rm = TRUE))%>%
+  mutate(countycode = "000")
+
+national_data <- v180 %>%
+  summarise(v180_rawvalue = median(v180_rawvalue, na.rm = TRUE)) %>%
+  mutate(statecode = "00") %>%
+  mutate(countycode = "000")
+
+v180_1 <- bind_rows(v180, state_data, national_data)
+v180_2 <- v180_1 %>% arrange(statecode, countycode) %>%
+  glimpse()
+```
+
+
+##  save data
+
+```{r}
+write_csv(v180_2,
+          paste0("../measure_datasets/", "v180", "_r2026",
+                 ".csv"),
+          na = "")
+```
