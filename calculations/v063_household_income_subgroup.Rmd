@@ -1,6 +1,6 @@
 ---
-title: "v063_otherdata (subgroups) - R2025"
-author: "GL"
+title: "v063_otherdata (subgroups) - R2026"
+author: "GL" "EB update"
 output: html_document
 ---
 
@@ -91,7 +91,7 @@ standardize_fips <- function(df){
 ```{r}
 save_data <- function(df, vnum, output_dir = "../measure_datasets/") {
   df %>%
-    write_csv(paste0(output_dir, vnum, "_r2025.csv"), na = "")
+    write_csv(paste0(output_dir, vnum, "_r2026.csv"), na = "")
 }
 ```
 
@@ -190,25 +190,25 @@ v063_other_3 <- v063_other_2 %>%
 ```
 
 
-# supression
+# suppression
 
 per verification:
 
 V063_race: There were a few large outliers with non-overlapping C.I.s: 
-for Black, county 55085 jumped from 31,000 to 173,000 (missing in 2022 and 2023), 
-for Asian county 42131 jumped from 26,000 to 151,000 (missing in 2022 and 2023). 
+for Black, county 17005 jumped from 6,400 to 119,000 (missing in 2023 and 6,400 in 2024), 
+for AIAN county 50025 jumped from 12,000 to 131,000 (15,000 in 2023 and 16,000 in 2024). 
 
 Suppression of values for the above cases.
 
 ```{r}
 v063_other_4 <- v063_other_3 %>%
-  # Black 55085
+  # Black 17005
   mutate(across(starts_with("v063_race_black"), ~if_else(
-  statecode == '55' & countycode == '085', NA_real_, .x
+  statecode == '17' & countycode == '005', NA_real_, .x
 ))) %>%
-  # Asian 42131
-  mutate(across(starts_with("v063_race_asian"), ~if_else(
-  statecode == '42' & countycode == '131', NA_real_, .x
+  # AIAN 50025
+  mutate(across(starts_with("v063_race_aian"), ~if_else(
+  statecode == '50' & countycode == '025', NA_real_, .x
 ))) 
 
 v063_other_4
