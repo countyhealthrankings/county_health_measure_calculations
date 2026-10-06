@@ -335,17 +335,23 @@ this is specific to the 2026 release. the decision to suppress the values for th
 v024_subgroup <- v024_subgroup %>%
   mutate(
     # Set the specified Black variables to NA for specific statecode and countycode combinations
-    v024black = ifelse((statecode == 51 & countycode == 580) | (statecode == 53 & countycode == "027"), NA, v024black),
-    blacknum = ifelse((statecode == 51 & countycode == 580) | (statecode == 53 & countycode == "027"), NA, blacknum),
-    blackdenom = ifelse((statecode == 51 & countycode == 580) | (statecode == 53 & countycode == "027"), NA, blackdenom),
-    v024blacklow = ifelse((statecode == 51 & countycode == 580) | (statecode == 53 & countycode == "027"), NA, v024blacklow),
-    v024blackhigh = ifelse((statecode == 51 & countycode == 580) | (statecode == 53 & countycode == "027"), NA, v024blackhigh),
-    # Set the specified Hispanic variables to NA for a specific statecode and countycode combination
-    v024hispanic = ifelse(statecode == 13 & countycode == 235, NA, v024hispanic),
-    hispanicnum = ifelse(statecode == 13 & countycode == 235, NA, hispanicnum),
-    hispanicdenom = ifelse(statecode == 13 & countycode == 235, NA, hispanicdenom),
-    v024hispaniclow = ifelse(statecode == 13 & countycode == 235, NA, v024hispaniclow),
-    v024hispanichigh = ifelse(statecode == 13 & countycode == 235, NA, v024hispanichigh)
+    v024black = ifelse((statecode == 05 & countycode == 115), NA, v024black),
+    blacknum = ifelse((statecode == 05 & countycode == 115), NA, blacknum),
+    blackdenom = ifelse((statecode == 05 & countycode == 115),NA, blackdenom),
+    v024blacklow = ifelse((statecode == 05 & countycode == 115), NA, v024blacklow),
+    v024blackhigh = ifelse((statecode == 05 & countycode == 115), NA, v024blackhigh),
+    # Set the specified AIAN variables to NA for a specific statecode and countycode combination
+    v024aian = ifelse(statecode == 13 & countycode == 129, NA, v024aian),
+    aiannum = ifelse(statecode == 13 & countycode == 129, NA, aiannum),
+    aiandenom = ifelse(statecode == 13 & countycode == 129, NA, aiandenom),
+    v024aianlow = ifelse(statecode == 13 & countycode == 129, NA, v024aianlow),
+    v024aianhigh = ifelse(statecode == 13 & countycode == 129, NA, v024aianhigh),
+    # Set the specified White variables to NA for a specific statecode and countycode combination
+    v024white = ifelse(statecode == 01 & countycode == 063, NA, v024white),
+    whitenum = ifelse(statecode == 01 & countycode == 063, NA, whitenum),
+    whitedenom = ifelse(statecode == 01 & countycode == 063, NA, whitedenom),
+    v024whitelow = ifelse(statecode == 01 & countycode == 063, NA, v024whitelow),
+    v024whitehigh = ifelse(statecode == 01 & countycode == 063, NA, v024whitehigh)
   )
 
 ```
