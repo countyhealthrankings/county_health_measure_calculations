@@ -1,6 +1,6 @@
 ---
 title: "v024 children in poverty subgroups"
-author: how 
+author: how, update: EB
 format: html
 ---
 # Description 
@@ -38,10 +38,10 @@ Administrative records, intercensal population estimates, decennial census, and 
 
 
 # What years of data does this measure actually represent? 
-2023 & 2019-2023
+2024 & 2020-2024
 
 # What release year(s) of the data system were used? 
-2024
+2025
 
 # Any age or gender specifications?
 Children under the age of 18
@@ -63,12 +63,12 @@ v024_cilow =  v024_rawvalue - cidistance_pov;
 v024_cihigh =  v024_rawvalue + cidistance_pov;
 
 # Website to downloaded data 
-https://www.census.gov/data/datasets/2023/demo/saipe/2023-state-and-county.html
+https://www.census.gov/data/datasets/2024/demo/saipe/2024-state-and-county.html
 Directions Orphaned in CHR&R Database
 Create 95% confidence intervals from the given 90% confidence intervals.
 
 # 95% Confidence Interval: 
-see this document for formula: https://www2.census.gov/programs-surveys/acs/tech_docs/statistical_testing/2023_Instructions_for_Stat_Testing_ACS.pdf
+see this document for formula: https://www2.census.gov/programs-surveys/acs/tech_docs/statistical_testing/2024_Instructions_for_Stat_Testing_ACS.pdf
 
 cidistance_pov = 1.96/1.645*(POV_90UCL-POV_U18PCT);
 v024_cilow =  v024_rawvalue - cidistance_pov;
@@ -133,7 +133,7 @@ county_data <- map_dfr(
   ~ get_acs(
       geography = "county",
       table = .x,
-      year = 2023,
+      year = 2024,
       survey = "acs5"
     )
 )
@@ -143,7 +143,7 @@ state_data <- map_dfr(
   ~ get_acs(
       geography = "state",
       table = .x,
-      year = 2022,
+      year = 2024,
       survey = "acs5"
     )
 ) |> mutate(GEOID = str_pad(GEOID, width = 5, side = "right", pad = "0"))
@@ -154,7 +154,7 @@ ntl_data <- map_dfr(
   ~ get_acs(
       geography = "us",
       table = .x,
-      year = 2023,
+      year = 2024,
       survey = "acs5"
     )) |> 
         mutate(GEOID = "00000")
@@ -280,9 +280,56 @@ pov_vars <- poverty_race %>%
 v024_subgroup = merge(fips, pov_vars, by = c("statecode", "countycode"), all.x = TRUE) 
 ```
 
+## add flag_CT
+
+- This function adds a flag to the data frame for Connecticut counties.
+- 'A' = data *available* for a CT county
+- 'U' = data *unavailable* for a CT county
+
+```{r}
+add_flag_CT <- function(df, vnum, old="U", new = "A"){
+  CT_old_lst <- c("001", "003", "005", "007", "009", "011", "013", "015")
+  CT_new_lst <- c("110", "120", "130", "140", "150", "160", "170", "180", "190")
+
+  res <- df %>% 
+    mutate(flag_CT = case_when(
+      statecode == "09" & countycode %in% CT_old_lst ~ old,
+      statecode == "09" & countycode %in% CT_new_lst ~ new,
+      TRUE ~ NA
+    )) %>% 
+    rename(!!(paste0(vnum, "_flag_CT")) := flag_CT)
+  
+  return(res)
+
+}
+
+```
+
+## standardize fips
+
+```{r}
+standardize_fips <- function(df){
+  res <- fips %>% 
+    select(statecode, countycode) %>% 
+    left_join(df, by = c("statecode", "countycode"))
+  
+  return(res)
+}
+
+```
+
+# add old CT counties and add flag_CT
+
+```{r}
+v024_subgroup <- v024_subgroup %>% 
+  standardize_fips() %>% 
+  add_flag_CT(vnum = "v024_race", old="U", new = "A")
+
+v024_subgroup
+```
 
 # suppress a couple of counties with values outside expected/plausible
-this is specific to the 2025 release. the decision to suppress the values for these subgroups and these counties was based on information gleaned during the validation step (not included in this measure caluclations repository)
+this is specific to the 2026 release. the decision to suppress the values for these subgroups and these counties was based on information gleaned during the validation step (not included in this measure caluclations repository)
 ```{r}
 # some suppressions 
 v024_subgroup <- v024_subgroup %>%
@@ -305,6 +352,6 @@ v024_subgroup <- v024_subgroup %>%
 
 # save to project 
 ```{r}
-readr::write_csv(v024_subgroup, file = here("measure_datasets/v024_subgroup_r2025.csv"))
+readr::write_csv(v024_subgroup, file = here("measure_datasets/v024_subgroup_r2026.csv"))
 
 ```
