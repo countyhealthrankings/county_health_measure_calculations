@@ -244,7 +244,9 @@ v004 %>%
 #----- switches: set any to its "old" setting to turn that change off --------------------------
 v004_cutoff_new        <- 10000   # A: old rule = 2000
 v004_flag_small_counts <- TRUE    # E: old rule = FALSE (no small-count status)
-v004_zero_ratio_rule   <- "NA"    # D/Q1: "NA" (recommended) or "zero" (mental health pattern)
+v004_zero_ratio_rule   <- "NA"    # D/Q1: "NA" or "zero" (mental health pattern)
+#Q1 DECIDED (Nov 19, 2026): the ratio is NA whenever there are 0 providers, and the status column
+#("none_reported" or "check_data") explains why. The same rule applies to v004, v088, v062 and v131.
 
 #----- checks on the original calculation -------------------------------------------------------
 #the national values above are typed in; confirm they equal the sums computed from the data
