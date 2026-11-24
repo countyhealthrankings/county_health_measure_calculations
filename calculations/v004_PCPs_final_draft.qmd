@@ -32,12 +32,13 @@ editor: visual
 
 Changes from the current method:
 
-1.  **One population cutoff of 10,000** (was 2,000) for deciding how to treat counties with zero primary care physicians.
-2.  **Zero physicians, population 10,000 or fewer:** shown as a real zero (`v004_rawvalue` = 0), status `none_reported`.
-3.  **Zero physicians, population above 10,000:** value blank, status `check_data`.
-4.  **Ratio for zero physicians:** always blank (population per physician is undefined at zero); the status column explains why. The same rule will apply to dentists, mental health and other primary care providers.
-5.  **Small counts flagged:** counties with 1 to 4 physicians keep their value but get status `fewer_than_5` (less reliable).
-6.  **National values computed from the data** instead of typed in.
+1.  **Two population cutoffs, 5,000 and 10,000** (was one cutoff of 2,000), for deciding how to treat counties with zero primary care physicians.
+2.  **Zero physicians, population 5,000 or fewer:** shown as a real zero (`v004_rawvalue` = 0), status `none_reported`.
+3.  **Zero physicians, population 5,001 to 10,000:** shown as a real zero, status `none_reported_caution`.
+4.  **Zero physicians, population above 10,000:** value blank, status `none_reported_verify`.
+5.  **Ratio for zero physicians:** always blank (population per physician is undefined at zero); the status column explains why. The same rule will apply to dentists, mental health and other primary care providers.
+6.  **Small counts flagged:** counties with 1 to 4 physicians keep their value but get status `fewer_than_5` (less reliable). Counties with 5 or more are `reported`. Connecticut is `not_calculated`, and anything else is `no_data`.
+7.  **National values computed from the data** instead of typed in.
 
 Connecticut: this measure was not updated for Connecticut with the 2024-2025 release of the AHRF. The AHRF has data for the eight former CT counties, but there is no recent population data for those counties to use as a denominator. CHR&R also decided not to update CT data for any measures in the rolling 2025 updates because of the geography changes. CT counties and the CT state value are left blank and flagged `U`. CT physicians and population still count toward the national value.
 
@@ -46,9 +47,10 @@ library(tidyverse)
 library(haven)
 library(here)
 
-#population cutoff for zero-physician counties, and the small-count threshold
-pop_cutoff  <- 10000
-small_count <- 5
+#population cutoffs for zero-physician counties, and the small-count threshold
+pop_cutoff_low  <- 5000
+pop_cutoff_high <- 10000
+small_count     <- 5
 ```
 
 ## Calculating the numerator - counties
@@ -128,14 +130,16 @@ v004_base <- bind_rows(national, states, counties) %>%
 v004 <- v004_base %>%
   mutate(
     v004_status = case_when(
-      is.na(v004_numerator) | is.na(v004_denominator)       ~ "not_calculated", # CT
-      v004_numerator == 0 & v004_denominator <= pop_cutoff  ~ "none_reported",
-      v004_numerator == 0                                   ~ "check_data",
-      v004_numerator < small_count                          ~ "fewer_than_5",
-      TRUE                                                  ~ "reported"
+      statecode == "09"                                         ~ "not_calculated", # CT
+      v004_numerator == 0 & v004_denominator <= pop_cutoff_low  ~ "none_reported",
+      v004_numerator == 0 & v004_denominator <= pop_cutoff_high ~ "none_reported_caution",
+      v004_numerator == 0 & v004_denominator >  pop_cutoff_high ~ "none_reported_verify",
+      v004_numerator >= 1 & v004_numerator < small_count        ~ "fewer_than_5",
+      v004_numerator >= small_count                             ~ "reported",
+      TRUE                                                      ~ "no_data"
     ),
-    #rate: 0 for none_reported, blank for check_data
-    v004_rawvalue = if_else(v004_status == "check_data", NA_real_,
+    #rate: 0 for none_reported and none_reported_caution, blank for none_reported_verify
+    v004_rawvalue = if_else(v004_status == "none_reported_verify", NA_real_,
                             v004_numerator / v004_denominator),
     #ratio: blank whenever there are 0 physicians (undefined)
     v004_rawalternatevalue = if_else(v004_numerator == 0, NA_real_,

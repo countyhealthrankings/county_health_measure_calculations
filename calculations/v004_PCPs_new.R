@@ -232,9 +232,11 @@ v004 %>%
 # everything below only ADDS columns with a _new suffix (plus v004_blank_change) to a copy of v004.
 #
 # Rules applied (handoff decisions A-E):
-#   A  one population cutoff of 10,000 (replaces 2,000 for PCPs)
-#   B  0 PCPs and population <= cutoff  -> real zero, status "none_reported"
-#   C  0 PCPs and population >  cutoff  -> blank, status "check_data"
+#   A  two population cutoffs, 5,000 and 10,000 (replace 2,000 for PCPs)
+#   B  0 PCPs and population <= 5,000          -> real zero, status "none_reported"
+#      0 PCPs and population 5,001 to 10,000   -> real zero, status "none_reported_caution"
+#   C  0 PCPs and population >  10,000         -> blank, status "none_reported_verify"
+#      (new status rule decided Nov 24, 2026; CT stays "not_calculated", anything else "no_data")
 #   D  ratio (rawalternatevalue) for 0 PCPs: NA, with status explaining it (open question Q1)
 #   E  1-4 PCPs -> status "fewer_than_5" (value kept, flagged as less reliable)
 # Population = v004_denominator (same population the measure itself uses).
@@ -242,11 +244,12 @@ v004 %>%
 ##################################################################################################
 
 #----- switches: set any to its "old" setting to turn that change off --------------------------
+v004_cutoff_low_new    <- 5000    # A: none_reported / none_reported_caution boundary
 v004_cutoff_new        <- 10000   # A: old rule = 2000
 v004_flag_small_counts <- TRUE    # E: old rule = FALSE (no small-count status)
 v004_zero_ratio_rule   <- "NA"    # D/Q1: "NA" or "zero" (mental health pattern)
 #Q1 DECIDED (Nov 19, 2026): the ratio is NA whenever there are 0 providers, and the status column
-#("none_reported" or "check_data") explains why. The same rule applies to v004, v088, v062 and v131.
+#("none_reported", "none_reported_caution" or "none_reported_verify") explains why. The same rule applies to v004, v088, v062 and v131.
 
 #----- checks on the original calculation -------------------------------------------------------
 #the national values above are typed in; confirm they equal the sums computed from the data
@@ -261,24 +264,27 @@ stopifnot(
 v004_new <- v004 %>%
   mutate(
     v004_status_new = case_when(
-      is.na(v004_numerator) | is.na(v004_denominator)            ~ "not_calculated", # CT
-      v004_numerator == 0 & v004_denominator <= v004_cutoff_new  ~ "none_reported",
-      v004_numerator == 0                                        ~ "check_data",
-      v004_flag_small_counts & v004_numerator < 5                ~ "fewer_than_5",
-      TRUE                                                       ~ "reported"
+      statecode == "09"                                              ~ "not_calculated", # CT
+      v004_numerator == 0 & v004_denominator <= v004_cutoff_low_new  ~ "none_reported",
+      v004_numerator == 0 & v004_denominator <= v004_cutoff_new      ~ "none_reported_caution",
+      v004_numerator == 0 & v004_denominator >  v004_cutoff_new      ~ "none_reported_verify",
+      v004_flag_small_counts & v004_numerator >= 1 &
+        v004_numerator < 5                                           ~ "fewer_than_5",
+      v004_numerator >= 1                                            ~ "reported",
+      TRUE                                                           ~ "no_data"
     ),
     v004_rawvalue_new = if_else(
-      v004_status_new == "check_data",
+      v004_status_new == "none_reported_verify",
       NA_real_,
       v004_numerator / v004_denominator
     ),
     v004_rawalternatevalue_new = case_when(
-      v004_status_new %in% c("none_reported", "check_data") & v004_zero_ratio_rule == "zero" ~ 0,
+      str_starts(v004_status_new, "none_reported") & v004_zero_ratio_rule == "zero" ~ 0,
       v004_numerator == 0 ~ NA_real_,
       TRUE ~ v004_denominator / v004_numerator
     ),
     v004_blank_change = case_when(
-      is.na(v004_rawvalue) & v004_status_new == "check_data"  ~ "blank_stays",
+      is.na(v004_rawvalue) & v004_status_new == "none_reported_verify" ~ "blank_stays",
       is.na(v004_rawvalue) & !is.na(v004_rawvalue_new)        ~ "blank_to_zero",
       (is.na(v004_rawvalue) & is.na(v004_rawvalue_new)) |
         (v004_rawvalue == v004_rawvalue_new)                  ~ "same",
@@ -302,11 +308,13 @@ v004_new_cty <- v004_new %>%
 #0. switch summary: how many counties each change affects
 tibble(
   change = c(paste0("A-C: cutoff ", v004_cutoff_new, " (blank -> none reported)"),
-             "A-C: still blank above cutoff (check_data)",
+             "A-C: still blank above cutoff (none_reported_verify)",
+             "B: zero, population 5,001-10,000 (none_reported_caution)",
              "E: flagged fewer than 5 PCPs",
              paste0("D: zero ratio rule = ", v004_zero_ratio_rule, " (ratio changed)")),
   counties = c(sum(v004_new_cty$v004_blank_change == "blank_to_zero"),
-               sum(v004_new_cty$v004_status_new == "check_data"),
+               sum(v004_new_cty$v004_status_new == "none_reported_verify"),
+               sum(v004_new_cty$v004_status_new == "none_reported_caution"),
                sum(v004_new_cty$v004_status_new == "fewer_than_5"),
                with(v004_new_cty, sum(!(is.na(v004_rawalternatevalue) & is.na(v004_rawalternatevalue_new)) &
                                         !coalesce(v004_rawalternatevalue == v004_rawalternatevalue_new, FALSE))))
